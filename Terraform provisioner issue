@@ -1,0 +1,194 @@
+
+resource "aws_vpc" "First" {
+  cidr_block           = "10.10.0.0/16"
+  enable_dns_hostnames =  true
+  tags = {
+    Name = "First Lab"
+  }
+}
+resource "aws_subnet" "First" {
+  vpc_id     = "${aws_vpc.First.id}"
+  availability_zone  = "${var.subnetaz1}"
+  cidr_block = "10.10.0.0/24"
+
+  tags = {
+    Name = "First Lab"
+  }
+}
+
+resource "aws_subnet" "second" {
+  vpc_id     = "${aws_vpc.First.id}"
+  cidr_block = "10.10.1.0/24"
+  availability_zone  = "${var.subnetaz2}"
+  tags = {
+    Name = "First Lab"
+  }
+}
+resource "aws_internet_gateway" "First"{
+    vpc_id = "${aws_vpc.First.id}"
+    tags = {
+        Name = "First Lab"
+    }
+}
+resource "aws_route_table" "first"{
+    vpc_id = "${aws_vpc.First.id}"
+    route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = "${aws_internet_gateway.First.id}"
+    }
+    tags = {
+       Name = "first Lab"        
+    }
+}
+
+resource "aws_route_table_association" "firsttest" {
+  subnet_id = "${aws_subnet.First.id}"
+  route_table_id = "${aws_route_table.first.id}"
+  
+}
+
+resource "aws_route_table_association" "secondtest" {
+  subnet_id = "${aws_subnet.second.id}"
+  route_table_id = "${aws_route_table.first.id}"
+  
+}
+resource "aws_security_group" "firstgroup" {
+  name = "first group"
+  description = "awssecutity group by terraform"
+  vpc_id = "${aws_vpc.First.id}"
+  ingress {
+    cidr_blocks = ["0.0.0.0/0"]
+    from_port = "0"
+    to_port   = "0"
+    protocol = "-1"
+  }
+  egress {
+    cidr_blocks = ["0.0.0.0/0"]
+    from_port = "0"
+    to_port   = "0"
+    protocol = "-1"
+  }
+  tags ={
+    Name = "First Lab"
+  }
+}
+  resource  "aws_instance" "firstinstance" {
+    ami =  "${var.appserverami}"
+    subnet_id = "${aws_subnet.First.id}"
+    instance_type = "t2.micro"
+    vpc_security_group_ids =  [ "${aws_security_group.firstgroup.id}" ]
+    key_name = "${var.awskeypair}"
+    associate_public_ip_address = true
+    tags = {
+      Name = "Firstin TF"
+    }
+
+    connection {
+      type = "ssh"
+      user = "${var.sshusername}"
+      private_key = "${file(var.sshkeypath)}"
+      host = "${aws_instance.firstinstance.public_ip}"
+    }
+     provisioner "remote_exec" {
+       inline = [
+         "sudo apt-get update",
+         "sudo apt-get install  openjdk-8-jdk -y",
+         "sudo apt-get install tomcat8 -y"
+       ]
+     }
+ }
+   resource  "aws_instance" "secondinstance" {
+    ami =  "${var.appserverami}"
+    subnet_id = "${aws_subnet.second.id}"
+    instance_type = "t2.micro"
+    vpc_security_group_ids = [ "${aws_security_group.firstgroup.id}" ]
+    key_name = "${var.awskeypair}"
+    associate_public_ip_address = true
+    tags = {
+      Name = "Secondins TF"
+       }
+
+      connection {
+      type = "ssh"
+      user = "${var.sshusername}"
+      private_key = "${file(var.sshkeypath)}"
+      host = "${aws_instance.secondinstance.public_ip}"
+    }
+     provisioner "remote_exec" {
+       inline = [
+         "sudo apt-get update",
+         "sudo apt-get install  openjdk-8-jdk -y",
+         "sudo apt-get install tomcat8 -y"
+       ]
+     }
+   }
+
+
+
+-------------------------------------------------
+
+
+provider :
+
+----------
+
+provider "aws" {
+region         = "${var.region}"
+access_key     = "${var.accesskey}"
+secret_key     = "${var.secrtkey}"
+}
+
+
+-------------------------
+
+
+Variable 
+
+
+-----------------------
+
+variable "accesskey" {
+    type = "string"
+}
+
+variable  "secrtkey" {
+    type = "string"
+}
+
+variable "region" {
+    type = "string"
+    default = "us-west-2"
+}
+
+variable "subnetaz1" {
+    type = "string"
+    default = "us-west-2a"
+}
+
+variable "subnetaz2" {
+    type = "string"
+    default = "us-west-2b"
+}
+variable "appserverami" {
+  type =  "string"
+  default = "ami-087c2c50437d0b80d"
+}
+
+variable "awskeypair" {
+    type = "string"
+    default = "forterraform"
+}
+
+variable "sshusername" {
+    type = "string"
+    default = "ubuntu"
+}
+
+variable "sshkeypath" {
+    type = "string"
+    default = "./forterraform.pem"
+}
+
+------------------------
+
+
